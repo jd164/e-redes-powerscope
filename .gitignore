@@ -1,0 +1,39 @@
+# Dependências do Node
+node_modules/
+package-lock.json
+
+# Ficheiros de dados reais e consumos pessoais do utilizador
+Consumos_PT*.xlsx
+Consumos_PT*.xls
+Consumos_PT*.csv
+*.xlsx
+*.xls
+*.csv
+!sample/Consumos_PT0002000000000000AA_Exemplo.xlsx
+
+# Ficheiros de ambiente e chaves/credenciais
+.env
+.env.*
+*.pem
+*.key
+*.cert
+
+# Logs e ficheiros temporários
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Ficheiros de Sistema Operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores e IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp

@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>E-REDES PowerScope | Analisador de Diagramas de Carga</title>
+  <meta name="description" content="Aplicação de análise e interpretação de diagramas de carga da E-REDES. Otimização de potência contratada, simulador de tarifários ERSE e monitorização de autoconsumo solar.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+  <link rel="stylesheet" href="index.css">
+  <!-- Bibliotecas Locais de Alto Desempenho -->
+  <script src="lib/xlsx.full.min.js"></script>
+  <script src="lib/echarts.min.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Cabeçalho Principal -->
+    <header class="app-header">
+      <div class="brand-wrapper">
+        <div class="brand-logo" id="app-logo">⚡</div>
+        <div class="brand-text">
+          <h1>E-REDES PowerScope</h1>
+          <p>Análise & Interpretação Inteligente de Diagramas de Carga (15 min)</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="btn-load-sample" class="btn btn-primary" title="Carregar o diagrama de carga de exemplo existente">
+          <span>📂</span> Carregar Exemplo (Agosto)
+        </button>
+        <button id="btn-export-csv" class="btn btn-outline" title="Exportar dados agregados diários">
+          <span>📥</span> Exportar CSV
+        </button>
+        <button id="btn-export-report" class="btn btn-outline" title="Imprimir ou guardar como PDF">
+          <span>🖨️</span> Relatório PDF
+        </button>
+      </div>
+    </header>
+
+    <!-- Barra de Metadados do Conjunto Ativo -->
+    <div class="metadata-bar" id="metadata-bar">
+      <div class="meta-item">
+        <span>CPE:</span>
+        <strong id="meta-cpe">-</strong>
+      </div>
+      <div class="meta-item">
+        <span>Período:</span>
+        <strong id="meta-period">-</strong>
+      </div>
+      <div class="meta-item">
+        <span>Amostras:</span>
+        <strong id="meta-records">-</strong>
+      </div>
+      <div class="meta-item">
+        <span>Qualidade:</span>
+        <span id="meta-quality" class="badge badge-success">-</span>
+      </div>
+      <div class="meta-item">
+        <span>Origem:</span>
+        <span id="files-badge" class="badge badge-cyan">-</span>
+      </div>
+    </div>
+
+    <!-- Zona de Carregamento Drag & Drop -->
+    <section class="dropzone" id="dropzone">
+      <input type="file" id="file-input" multiple accept=".xlsx, .xls, .csv" style="display: none;">
+      <div class="dropzone-content">
+        <div class="dropzone-icon">📊</div>
+        <h2 class="dropzone-title">Arraste para aqui os seus Diagramas de Carga da E-REDES</h2>
+        <p class="dropzone-desc">
+          Suporta <strong>1 mês</strong>, <strong>múltiplos meses</strong> em lote ou <strong>1 ano completo</strong> (.xlsx ou .csv). 
+          Pode selecionar ou arrastar vários ficheiros mensais de uma só vez para análise consolidada!
+        </p>
+        <button type="button" class="btn btn-outline btn-sm" style="margin-top: 8px;">
+          <span>📁</span> Selecionar Ficheiros do Computador
+        </button>
+      </div>
+    </section>
+
+    <!-- Barra de Filtros e Controlos -->
+    <section class="filter-bar">
+      <div class="filter-group">
+        <span class="filter-label">Filtrar Mês:</span>
+        <select id="filter-month" class="select-input">
+          <option value="all">Todo o Histórico</option>
+        </select>
+
+        <span class="filter-label">Dias:</span>
+        <select id="filter-day-type" class="select-input">
+          <option value="all">Todos os Dias</option>
+          <option value="weekday">Apenas Dias Úteis (Seg-Sex)</option>
+          <option value="weekend">Apenas Fins de Semana (Sáb-Dom)</option>
+        </select>
+      </div>
+
+      <div class="filter-group" id="timeline-zoom-controls">
+        <span class="filter-label">Zoom Rápido:</span>
+        <button class="btn btn-outline btn-sm" data-zoom-range="24h">24 Horas</button>
+        <button class="btn btn-outline btn-sm" data-zoom-range="7d">7 Dias</button>
+        <button class="btn btn-outline btn-sm" data-zoom-range="30d">30 Dias</button>
+        <button class="btn btn-outline btn-sm" data-zoom-range="all">Tudo</button>
+      </div>
+    </section>
+
+    <!-- Grelha de Indicadores Chave (KPI Cards) -->
+    <section class="kpi-grid">
+      <!-- Consumo da Rede -->
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-title">Consumo da Rede (Líquido)</span>
+          <span class="kpi-icon">⚡</span>
+        </div>
+        <div class="kpi-value" id="kpi-kwh-medido">0 kWh</div>
+        <div class="kpi-sub" id="kpi-kwh-sub">Média diária: 0 kWh</div>
+      </div>
+
+      <!-- Pico Máximo de Potência -->
+      <div class="kpi-card kpi-power">
+        <div class="kpi-header">
+          <span class="kpi-title">Pico Máximo de Carga</span>
+          <span class="kpi-icon">📈</span>
+        </div>
+        <div class="kpi-value" id="kpi-peak-kw">0 kW</div>
+        <div class="kpi-sub" id="kpi-peak-sub">Quarto de hora mais exigente</div>
+      </div>
+
+      <!-- Potência Recomendada -->
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-title">Potência Recomendada</span>
+          <span class="kpi-icon">🛡️</span>
+        </div>
+        <div class="kpi-value" id="kpi-recommended-kva">0 kVA</div>
+        <div class="kpi-sub" id="kpi-recommended-sub">Escalão ideal sem disparos</div>
+      </div>
+
+      <!-- Horas de Vazio -->
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-title">Consumo em Vazio (ERSE)</span>
+          <span class="kpi-icon">🌙</span>
+        </div>
+        <div class="kpi-value" id="kpi-tariff-vazio">0%</div>
+        <div class="kpi-sub" id="kpi-tariff-sub">Análise tarifária</div>
+      </div>
+
+      <!-- Consumo Standby / Fantasma -->
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-title">Carga Standby / Baseload</span>
+          <span class="kpi-icon">🔌</span>
+        </div>
+        <div class="kpi-value" id="kpi-standby-watts">0 W</div>
+        <div class="kpi-sub" id="kpi-standby-sub">Consumo contínuo na madrugada</div>
+      </div>
+
+      <!-- Solar / UPAC (Oculto se não houver solar) -->
+      <div class="kpi-card kpi-solar" id="kpi-solar-card" style="display: none;">
+        <div class="kpi-header">
+          <span class="kpi-title">Excedente Solar Injetado</span>
+          <span class="kpi-icon">☀️</span>
+        </div>
+        <div class="kpi-value" id="kpi-solar-kwh">0 kWh</div>
+        <div class="kpi-sub" id="kpi-solar-sub">Autoconsumo instantâneo</div>
+      </div>
+    </section>
+
+    <!-- Painel de Diagnósticos e Recomendações Automáticas -->
+    <section class="insights-panel">
+      <div class="insights-panel-header">
+        <span>💡</span> Diagnóstico Inteligente & Recomendações
+      </div>
+      <div class="insights-grid" id="insights-container">
+        <!-- Preenchido dinamicamente pelo JavaScript -->
+      </div>
+    </section>
+
+    <!-- Abas de Análise e Gráficos -->
+    <section class="tabs-wrapper">
+      <nav class="tabs-nav">
+        <button class="tab-btn active" data-tab="tab-timeline">
+          <span>📈</span> Diagrama Contínuo (15 min)
+        </button>
+        <button class="tab-btn" data-tab="tab-profile">
+          <span>⏱️</span> Perfil 24 Horas & Heatmap
+        </button>
+        <button class="tab-btn" data-tab="tab-evolution">
+          <span>📊</span> Evolução Diária & Mensal
+        </button>
+        <button class="tab-btn" data-tab="tab-power">
+          <span>⚡</span> Otimização de Potência (kVA)
+        </button>
+        <button class="tab-btn" data-tab="tab-tariffs">
+          <span>💰</span> Simulador Tarifário ERSE
+        </button>
+      </nav>
+
+      <!-- Aba 1: Diagrama Contínuo -->
+      <div class="tab-content active" id="tab-timeline">
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <h3 class="chart-title">Curva de Carga a 15 Minutos (kW)</h3>
+              <p class="chart-desc">Leituras contínuas da E-REDES com indicação do escalão contratado recomendado e injeção solar.</p>
+            </div>
+          </div>
+          <div id="chart-timeline" class="chart-container"></div>
+        </div>
+      </div>
+
+      <!-- Aba 2: Perfil Diário & Heatmap -->
+      <div class="tab-content" id="tab-profile">
+        <div class="split-grid">
+          <div class="chart-card">
+            <div class="chart-header">
+              <div>
+                <h3 class="chart-title">Curva das 24 Horas (Média em kW)</h3>
+                <p class="chart-desc">Comparação direta entre o perfil de Dias Úteis vs Fins de Semana e perfil solar.</p>
+              </div>
+            </div>
+            <div id="chart-profile24h" class="chart-container"></div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <div>
+                <h3 class="chart-title">Mapa de Calor (Heatmap 24h x Dias)</h3>
+                <p class="chart-desc">Identifique rapidamente a que horas e em que dias a sua casa mais consome.</p>
+              </div>
+            </div>
+            <div id="chart-heatmap" class="chart-container"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Aba 3: Evolução Diária / Mensal -->
+      <div class="tab-content" id="tab-evolution">
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <h3 class="chart-title">Evolução do Consumo, Injeção e Pico</h3>
+              <p class="chart-desc">Totais de energia consumida da rede (kWh), energia solar injetada e pico máximo diário/mensal.</p>
+            </div>
+            <div class="filter-group">
+              <button id="btn-agg-daily" class="btn btn-outline btn-sm active">Por Dia</button>
+              <button id="btn-agg-monthly" class="btn btn-outline btn-sm">Por Mês</button>
+            </div>
+          </div>
+          <div id="chart-evolution" class="chart-container"></div>
+        </div>
+      </div>
+
+      <!-- Aba 4: Otimização de Potência -->
+      <div class="tab-content" id="tab-power">
+        <div class="split-grid">
+          <div class="chart-card">
+            <div class="chart-header">
+              <div>
+                <h3 class="chart-title">Curva Monótona de Carga (Load Duration Curve)</h3>
+                <p class="chart-desc">Percentagem de tempo em que a instalação operou acima de cada patamar de potência.</p>
+              </div>
+            </div>
+            <div id="chart-ldc" class="chart-container"></div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <div>
+                <h3 class="chart-title">Avaliação de Risco por Escalão de Potência (kVA)</h3>
+                <p class="chart-desc">Verifique quantas horas o seu consumo ultrapassaria cada escalão normalizado em Portugal.</p>
+              </div>
+            </div>
+            <div class="custom-table-wrapper">
+              <table class="custom-table">
+                <thead>
+                  <tr>
+                    <th>Escalão (kVA)</th>
+                    <th>Corrente (A)</th>
+                    <th>Tipo</th>
+                    <th>Termo Fixo Est.</th>
+                    <th>Excedentes</th>
+                    <th>Estado de Risco</th>
+                  </tr>
+                </thead>
+                <tbody id="power-risk-table-body">
+                  <!-- Preenchido via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Aba 5: Simulador de Tarifários ERSE -->
+      <div class="tab-content" id="tab-tariffs">
+        <div class="split-grid">
+          <div class="chart-card">
+            <div class="chart-header">
+              <div>
+                <h3 class="chart-title">Repartição de Energia por Período Tarifário</h3>
+                <p class="chart-desc">Divisão oficial ERSE: se o consumo em Vazio for &gt; 35%, a tarifa bi-horária poupa dinheiro.</p>
+              </div>
+            </div>
+            <div id="chart-tariff-donut" class="chart-container"></div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <div>
+                <h3 class="chart-title">Simulação de Custos de Fatura Comparativa</h3>
+                <p class="chart-desc">Comparação financeira entre as opções regulamentadas em Portugal para este perfil.</p>
+              </div>
+            </div>
+            <div class="custom-table-wrapper">
+              <table class="custom-table">
+                <thead>
+                  <tr>
+                    <th>Modalidade Tarifária</th>
+                    <th>Custo no Período</th>
+                    <th>Poupança Anual Estimada</th>
+                  </tr>
+                </thead>
+                <tbody id="simulator-table-body">
+                  <!-- Preenchido via JS -->
+                </tbody>
+              </table>
+            </div>
+            <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+              * Cálculos baseados em preços médios de mercado liberalizado em Portugal e no termo fixo do escalão recomendado.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Loader Global -->
+  <div class="global-loader" id="global-loader">
+    <div class="spinner"></div>
+    <div style="font-weight: 600; color: #f8fafc;">A processar Diagrama de Carga E-REDES...</div>
+  </div>
+
+  <!-- Controlador Modular -->
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
