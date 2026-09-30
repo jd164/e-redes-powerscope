@@ -8,6 +8,8 @@
 [![Privacy: 100% Local](https://img.shields.io/badge/Privacidade-100%25_No_Browser-emerald?style=for-the-badge&logo=shield)](#-privacidade-e-seguran%C3%A7a)
 [![JavaScript](https://img.shields.io/badge/Vanilla_JS-ES6+-f59e0b?style=for-the-badge&logo=javascript)](https://developer.mozilla.org/)
 
+<img width="1440" height="1891" alt="imagem" src="https://github.com/user-attachments/assets/0dd0f440-cd16-4a40-8fe8-d73b2f766e3b" />
+
 ---
 
 ## 🌐 Experimentar Online (Sem Instalação)
